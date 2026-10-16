@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Manajemen Tim OSDM - Kelola Staf Aman</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        select {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 0.5rem center; background-size: 1em; padding-right: 1.5rem !important;
+        }
+        /* Custom scrollbar untuk modal */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+
+<!-- ================= LAYAR LOGIN ================= -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center bg-gray-100 absolute inset-0 z-50">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-200">
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold text-gray-800">Sistem Disposisi OSDM</h2>
+            <p class="text-gray-500 text-sm mt-2">Silakan login untuk masuk ke dashboard</p>
+        </div>
+        <div class="space-y-4">
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Username</label><input type="text" id="input-username" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan username"></div>
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Password</label><input type="password" id="input-password" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Masukkan password"></div>
+            <button onclick="prosesLogin()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition shadow-md mt-4" id="btn-login">Masuk</button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= DASHBOARD UTAMA ================= -->
+<div id="dashboard-screen" class="container mx-auto p-6 max-w-screen-2xl hidden">
+    <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Dashboard Distribusi Tugas</h1>
+            <p class="text-gray-600 mt-1">Pemantauan beban kerja, status disposisi, dan SLA tim</p>
+        </div>
+        <div class="flex gap-3 items-center">
+            <div class="bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm flex items-center gap-3">
+                <div class="text-sm"><span class="text-gray-500">Halo,</span> <span id="display-nama-user" class="font-bold text-gray-800">User</span> <span id="display-role-user" class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full ml-1 uppercase font-bold">Role</span></div>
+                <button onclick="bukaModalPassword()" class="text-xs text-blue-600 hover:text-blue-800 font-bold border-l pl-3 ml-1">Ubah Sandi</button>
+                <button onclick="prosesLogout()" class="text-xs text-red-500 hover:text-red-700 font-bold border-l pl-3 ml-1">Logout</button>
+            </div>
+            <button onclick="memuatDataAwal()" class="bg-white text-gray-700 px-4 py-2.5 rounded-lg border hover:bg-gray-100 shadow-sm font-medium transition-colors" title="Muat ulang data terbaru">Segarkan Data</button>
+            <button onclick="resetSemuaFilter()" class="bg-white text-gray-700 px-4 py-2.5 rounded-lg border hover:bg-gray-100 shadow-sm font-medium transition-colors">Reset Filter</button>
+            
+            <button id="btn-kelola-staf" onclick="bukaModalStaf()" class="bg-gray-800 text-white px-5 py-2.5 rounded-lg hover:bg-gray-900 shadow font-medium transition-colors hidden">👥 Kelola Staf</button>
+            <button id="btn-tambah" onclick="bukaModalTugas()" class="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 shadow font-medium transition-colors hidden">+ Tambah Disposisi</button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div onclick="setFilterStatus('Belum Dimulai')" id="card-Belum-Dimulai" class="cursor-pointer bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-gray-400 hover:shadow-md transition-all">
+            <div class="text-sm text-gray-500 font-semibold uppercase tracking-wide">Belum Dimulai</div><div class="text-3xl font-bold text-gray-700 mt-1" id="count-belum">0</div>
+        </div>
+        <div onclick="setFilterStatus('Berproses')" id="card-Berproses" class="cursor-pointer bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-blue-500 hover:shadow-md transition-all">
+            <div class="text-sm text-blue-500 font-semibold uppercase tracking-wide">Berproses</div><div class="text-3xl font-bold text-gray-700 mt-1" id="count-proses">0</div>
+        </div>
+        <div onclick="setFilterStatus('Hold')" id="card-Hold" class="cursor-pointer bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-orange-500 hover:shadow-md transition-all">
+            <div class="text-sm text-orange-500 font-semibold uppercase tracking-wide">Di-Hold</div><div class="text-3xl font-bold text-gray-700 mt-1" id="count-hold">0</div>
+        </div>
+        <div onclick="setFilterStatus('Selesai')" id="card-Selesai" class="cursor-pointer bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-green-500 hover:shadow-md transition-all">
+            <div class="text-sm text-green-500 font-semibold uppercase tracking-wide">Selesai</div><div class="text-3xl font-bold text-gray-700 mt-1" id="count-selesai">0</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div class="xl:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-200 self-start">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800 flex items-center justify-between"><span>Beban Kerja Aktif</span><span class="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded">Klik nama utk filter</span></h2>
+            <div id="team-list" class="space-y-3"></div>
+        </div>
+        <div class="xl:col-span-3 bg-white p-0 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 bg-white flex justify-between items-center"><h2 class="text-xl font-semibold text-gray-800" id="tabel-title">Daftar Pekerjaan Aktif</h2><span class="text-xs text-gray-500 italic">*Hanya admin & PIC yang dapat mengubah status</span></div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                            <th class="p-4 font-bold border-b w-1/4">Tugas / Disposisi</th><th class="p-4 font-bold border-b w-1/6">PIC</th><th class="p-4 font-bold border-b w-1/6">Status</th><th class="p-4 font-bold border-b w-1/4">Riwayat Waktu</th><th class="p-4 font-bold border-b w-1/6">Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-list" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAL KELOLA STAF (TAMBAH & HAPUS TERPUSAT) ================= -->
+<div id="modal-staf" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        
+        <!-- Header Modal -->
+        <div class="flex justify-between items-center p-6 border-b">
+            <h3 class="text-xl font-bold text-gray-800">Manajemen Pegawai</h3>
+            <button onclick="tutupModalStaf()" class="text-gray-400 hover:text-red-500 text-2xl font-bold leading-none">&times;</button>
+        </div>
+        
+        <!-- Body Modal (Bisa di-scroll) -->
+        <div class="p-6 overflow-y-auto custom-scroll flex-1 space-y-8">
+            
+            <!-- BAGIAN 1: TAMBAH STAF -->
+            <div class="bg-blue-50 border border-blue-100 p-5 rounded-xl">
+                <h4 class="font-bold text-blue-800 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                    Tambah Staf Baru
+                </h4>
+                <div class="space-y-3">
+                    <input type="text" id="input-staf-nama" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Lengkap">
+                    <input type="text" id="input-staf-user" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Username Login">
+                    <input type="text" id="input-staf-pass" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Password Awal" value="123456">
+                    <button onclick="simpanStafBaru()" id="btn-simpan-staf" class="w-full bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition">Simpan Akun Baru</button>
+                </div>
+            </div>
+
+            <!-- BAGIAN 2: HAPUS STAF -->
+            <div>
+                <h4 class="font-bold text-red-600 mb-4 pb-2 border-b border-red-100 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    Daftar Staf Aktif (Hapus)
+                </h4>
+                <div id="list-kelola-staf" class="space-y-2">
+                    <!-- Daftar staf akan di-render di sini oleh JavaScript -->
+                </div>
+                <p class="text-[10px] text-gray-500 italic mt-3 leading-tight">*Peringatan: Menghapus staf akan mengubah tugas yang dimilikinya menjadi status "Belum di-assign". Tindakan tidak dapat dibatalkan.</p>
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAL UBAH PASSWORD ================= -->
+<div id="modal-password" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 mx-4">
+        <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold text-gray-800">Ubah Password</h3><button onclick="tutupModalPassword()" class="text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button></div>
+        <div class="space-y-4">
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Password Saat Ini</label><input type="password" id="input-pass-lama" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></div>
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Password Baru</label><input type="password" id="input-pass-baru" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></div>
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Konfirmasi Password Baru</label><input type="password" id="input-pass-konfirm" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></div>
+        </div>
+        <div class="mt-8 flex justify-end gap-3 border-t pt-4"><button onclick="tutupModalPassword()" class="px-5 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200">Batal</button><button onclick="simpanPasswordBaru()" class="px-5 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">Simpan</button></div>
+    </div>
+</div>
+
+<!-- ================= MODAL TAMBAH TUGAS ================= -->
+<div id="modal-tambah" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 mx-4">
+        <div class="flex justify-between items-center mb-6"><h3 class="text-2xl font-bold text-gray-800">Form Disposisi Baru</h3><button onclick="tutupModalTugas()" class="text-gray-400 hover:text-red-500 text-2xl font-bold">&times;</button></div>
+        <div class="space-y-5">
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Judul Dokumen / Pekerjaan</label><input type="text" id="input-judul" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></div>
+            <div class="grid grid-cols-2 gap-4">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Kategori</label><select id="input-kategori" class="w-full border border-gray-300 rounded-lg p-2.5 bg-white"><option value="Mutasi">Mutasi</option><option value="Nota Dinas">Nota Dinas</option><option value="Penugasan ASN">Penugasan ASN</option><option value="Undangan">Undangan</option></select></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-1">Tugaskan Ke (PIC)</label><select id="input-pic" class="w-full border border-gray-300 rounded-lg p-2.5 bg-white"></select></div>
+            </div>
+        </div>
+        <div class="mt-8 flex justify-end gap-3 border-t pt-4"><button onclick="tutupModalTugas()" class="px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200">Batal</button><button onclick="simpanTugasBaru()" class="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">Simpan Disposisi</button></div>
+    </div>
+</div>
+
+<script>
+    const supabaseUrl = 'https://ztgrfzegxeovbkupslvz.supabase.co';
+    const supabaseKey = 'sb_publishable_STQLp6ubM4SQ1gl3sYAyDA_4BnaZWLL';
+    const db = supabase.createClient(supabaseUrl, supabaseKey);
+
+    let currentUser = null; 
+    let pegawaiList = [];
+    let tugasList = [];
+    let filterStatus = 'Semua'; 
+    let filterPicId = null;
+
+    function formatWaktu(isoString) {
+        if (!isoString) return '-';
+        const date = new Date(isoString);
+        return date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function prosesLogin() {
+        const btn = document.getElementById('btn-login');
+        const userInp = document.getElementById('input-username').value.toLowerCase().trim();
+        const passInp = document.getElementById('input-password').value;
+        if(!userInp || !passInp) return alert('Isi username dan password!');
+
+        btn.innerText = 'Memeriksa...';
+        const { data: user, error } = await db.from('pegawai').select('*').eq('username', userInp).single();
+        btn.innerText = 'Masuk';
+
+        if (error || !user) return alert('Username tidak ditemukan di database!');
+        if (user.password !== passInp) return alert('Password salah!');
+
+        currentUser = user; 
+        document.getElementById('input-password').value = ''; 
+        document.getElementById('login-screen').classList.add('hidden'); 
+        document.getElementById('dashboard-screen').classList.remove('hidden');
+        document.getElementById('display-nama-user').innerText = currentUser.nama; 
+        document.getElementById('display-role-user').innerText = currentUser.role;
+        
+        document.getElementById('btn-tambah').classList.toggle('hidden', currentUser.role !== 'admin');
+        document.getElementById('btn-kelola-staf').classList.toggle('hidden', currentUser.role !== 'admin');
+        
+        await memuatDataAwal();
+    }
+
+    function prosesLogout() { 
+        currentUser = null; document.getElementById('input-username').value = ''; document.getElementById('input-password').value = ''; 
+        document.getElementById('dashboard-screen').classList.add('hidden'); document.getElementById('login-screen').classList.remove('hidden'); 
+    }
+    
+    document.getElementById('input-username').addEventListener('keypress', function(e) { if(e.key === 'Enter') document.getElementById('input-password').focus(); });
+    document.getElementById('input-password').addEventListener('keypress', function(e) { if(e.key === 'Enter') prosesLogin(); });
+
+    async function memuatDataAwal() {
+        const { data: pData, error: pErr } = await db.from('pegawai').select('*').order('id', { ascending: true });
+        const { data: tData, error: tErr } = await db.from('tugas').select('*').order('created_at', { ascending: false });
+
+        if (pErr || tErr) return alert('Gagal menarik data dari database!');
+
+        pegawaiList = pData;
+        tugasList = tData;
+        resetSemuaFilter(); 
+    }
+
+    // --- MODAL KELOLA STAF (TAMBAH & RENDER HAPUS) ---
+    function bukaModalStaf() {
+        document.getElementById('input-staf-nama').value = '';
+        document.getElementById('input-staf-user').value = '';
+        document.getElementById('input-staf-pass').value = '123456';
+        renderDaftarHapusStaf(); // Render daftar staf di dalam modal
+        document.getElementById('modal-staf').classList.remove('hidden');
+    }
+    
+    function tutupModalStaf() { document.getElementById('modal-staf').classList.add('hidden'); }
+    
+    function renderDaftarHapusStaf() {
+        const listContainer = document.getElementById('list-kelola-staf');
+        listContainer.innerHTML = '';
+        const stafAktif = pegawaiList.filter(p => p.role !== 'admin');
+        
+        if (stafAktif.length === 0) {
+            listContainer.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed">Belum ada staf yang terdaftar.</p>';
+            return;
+        }
+
+        stafAktif.forEach(p => {
+            listContainer.innerHTML += `
+            <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-red-50 transition-colors">
+                <div>
+                    <div class="font-bold text-gray-800 text-sm">${p.nama}</div>
+                    <div class="text-xs text-gray-500 font-medium mt-0.5">Username: <span class="text-gray-700">${p.username}</span></div>
+                </div>
+                <button onclick="hapusStaf(event, ${p.id}, '${p.nama}')" class="bg-red-100 text-red-600 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm">Hapus</button>
+            </div>`;
+        });
+    }
+
+    async function simpanStafBaru() {
+        const nama = document.getElementById('input-staf-nama').value.trim();
+        const username = document.getElementById('input-staf-user').value.toLowerCase().trim();
+        const password = document.getElementById('input-staf-pass').value;
+        const btn = document.getElementById('btn-simpan-staf');
+
+        if (!nama || !username || !password) return alert('Semua kolom wajib diisi!');
+        if (password.length < 6) return alert('Password minimal 6 karakter!');
+
+        btn.innerText = 'Menyimpan...';
+        const { error } = await db.from('pegawai').insert([{ nama: nama, username: username, password: password, role: 'petugas', status_kehadiran: 'Tersedia' }]);
+        btn.innerText = 'Simpan Akun Baru';
+
+        if (error) {
+            if (error.code === '23505') return alert('Gagal: Username tersebut sudah digunakan!');
+            return alert('Gagal menambahkan pegawai ke database!');
+        }
+
+        // Segarkan data dan render ulang daftar di modal yang masih terbuka
+        await memuatDataAwal(); 
+        document.getElementById('input-staf-nama').value = '';
+        document.getElementById('input-staf-user').value = '';
+        renderDaftarHapusStaf(); 
+    }
+
+    async function hapusStaf(event, idPegawai, namaPegawai) {
+        event.preventDefault(); // Mencegah form reload jika ada
+        
+        const konfirmasi = confirm(`YAKIN HAPUS AKUN "${namaPegawai.toUpperCase()}"?\n\nTindakan ini tidak bisa dibatalkan.`);
+        if (!konfirmasi) return;
+
+        const { error: errUpdate } = await db.from('tugas').update({ pegawai_id: null }).eq('pegawai_id', idPegawai);
+        if (errUpdate) return alert('Gagal memproses pengalihan tugas.');
+
+        const { error: errDelete } = await db.from('pegawai').delete().eq('id', idPegawai);
+        if (errDelete) return alert('Gagal menghapus akun pegawai dari sistem.');
+        
+        if (filterPicId === idPegawai) filterPicId = null;
+        
+        await memuatDataAwal();
+        renderDaftarHapusStaf(); // Render ulang daftar hapus setelah berhasil
+    }
+
+    // --- FUNGSI DASHBOARD & TABEL (Sama seperti sebelumnya) ---
+    function bukaModalPassword() { document.getElementById('input-pass-lama').value = ''; document.getElementById('input-pass-baru').value = ''; document.getElementById('input-pass-konfirm').value = ''; document.getElementById('modal-password').classList.remove('hidden'); }
+    function tutupModalPassword() { document.getElementById('modal-password').classList.add('hidden'); }
+    async function simpanPasswordBaru() {
+        const l = document.getElementById('input-pass-lama').value, b = document.getElementById('input-pass-baru').value, k = document.getElementById('input-pass-konfirm').value;
+        if (l !== currentUser.password) return alert('Password Lama tidak sesuai!'); if (b.length < 6) return alert('Minimal 6 karakter!'); if (b !== k) return alert('Konfirmasi tidak cocok!');
+        const { error } = await db.from('pegawai').update({ password: b }).eq('id', currentUser.id);
+        if (error) return alert('Gagal memperbarui password di database!');
+        currentUser.password = b; alert('Password berhasil diubah!'); tutupModalPassword();
+    }
+
+    function resetSemuaFilter() { filterStatus = 'Semua'; filterPicId = null; updateJudulTabel(); renderDashboard(); }
+    function setFilterStatus(status) { filterStatus = filterStatus === status ? 'Semua' : status; updateJudulTabel(); renderDashboard(); }
+    function toggleFilterPic(picId) { if (currentUser.role !== 'admin' && currentUser.id !== picId) return; filterPicId = filterPicId === picId ? null : picId; updateJudulTabel(); renderDashboard(); }
+    function updateJudulTabel() {
+        let textJudul = 'Daftar Pekerjaan'; let picName = ''; if (filterPicId !== null) { const pic = pegawaiList.find(p => p.id === filterPicId); if (pic) picName = ` milik ${pic.nama}`; }
+        textJudul = filterStatus === 'Semua' ? (filterPicId ? `Pekerjaan Aktif${picName}` : 'Daftar Pekerjaan Aktif Seluruh Tim') : (filterPicId ? `Pekerjaan ${filterStatus}${picName}` : `Daftar Pekerjaan Tim: ${filterStatus}`);
+        document.getElementById('tabel-title').innerText = textJudul;
+    }
+
+    function renderDashboard() { updateSummaryCards(); renderTeam(); renderTasks(); }
+
+    function updateSummaryCards() {
+        document.getElementById('count-belum').innerText = tugasList.filter(t => t.status === 'Belum Dimulai').length;
+        document.getElementById('count-proses').innerText = tugasList.filter(t => t.status === 'Berproses').length;
+        document.getElementById('count-hold').innerText = tugasList.filter(t => t.status === 'Hold').length;
+        document.getElementById('count-selesai').innerText = tugasList.filter(t => t.status === 'Selesai').length;
+        ['Belum-Dimulai', 'Berproses', 'Hold', 'Selesai'].forEach(status => {
+            const el = document.getElementById(`card-${status}`);
+            if(status.replace('-', ' ') === filterStatus) el.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2', 'bg-blue-50');
+            else el.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2', 'bg-blue-50');
+        });
+    }
+
+    function renderTeam() {
+        const teamList = document.getElementById('team-list'); teamList.innerHTML = '';
+        pegawaiList.forEach(p => {
+            if (p.role === 'admin') return; 
+            
+            const tugasAktif = tugasList.filter(t => t.pegawai_id === p.id && t.status !== 'Selesai').length;
+            let statusColor = p.status_kehadiran === 'Tersedia' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700';
+            const canInteract = currentUser.role === 'admin' || currentUser.id === p.id;
+            
+            let cardStyle = canInteract ? (filterPicId === p.id ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400 ring-offset-1' : (tugasAktif > 3 ? 'bg-red-50 border-red-300' : 'bg-white border-gray-200')) : 'border-gray-200';
+            let cursorStyle = canInteract ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : 'cursor-not-allowed opacity-40 grayscale bg-gray-100';
+            let meBadge = (currentUser.id === p.id && currentUser.role !== 'admin') ? `<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold ml-2 shadow-sm">ANDA</span>` : '';
+            let overloadBadge = (tugasAktif > 3 && canInteract) ? `<span class="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full font-bold ml-2">OVERLOAD</span>` : '';
+            
+            teamList.innerHTML += `<div class="flex justify-between items-center p-4 border rounded-xl transition-all duration-300 ${cardStyle} ${cursorStyle}" onclick="toggleFilterPic(${p.id})">
+                <div><div class="font-bold text-gray-800 flex items-center">${p.nama} ${overloadBadge} ${meBadge}</div><div class="mt-1"><span class="text-xs px-2.5 py-1 rounded-md border font-medium ${statusColor}">${p.status_kehadiran}</span></div></div>
+                <div class="text-right"><div class="text-3xl font-black ${tugasAktif > 3 && canInteract ? 'text-red-600' : 'text-blue-600'}">${tugasAktif}</div></div>
+            </div>`;
+        });
+    }
+
+    function renderTasks() {
+        const taskList = document.getElementById('task-list'); taskList.innerHTML = '';
+        let filteredTugas = tugasList;
+        if (filterStatus !== 'Semua') filteredTugas = filteredTugas.filter(t => t.status === filterStatus); else filteredTugas = filteredTugas.filter(t => t.status !== 'Selesai');
+        if (filterPicId !== null) filteredTugas = filteredTugas.filter(t => t.pegawai_id === filterPicId);
+        
+        if(filteredTugas.length === 0) { taskList.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-500">Tidak ada data pekerjaan.</td></tr>`; return; }
+
+        filteredTugas.forEach(t => {
+            const pic = pegawaiList.find(p => p.id === t.pegawai_id); const namaPic = pic ? pic.nama : '<span class="text-red-500 font-bold">Belum di-assign</span>';
+            let bgStatus = '';
+            if(t.status === 'Belum Dimulai') bgStatus = 'bg-gray-100 text-gray-700 border-gray-300'; if(t.status === 'Berproses') bgStatus = 'bg-blue-100 text-blue-700 border-blue-300';
+            if(t.status === 'Hold') bgStatus = 'bg-orange-100 text-orange-700 border-orange-300'; if(t.status === 'Selesai') bgStatus = 'bg-green-100 text-green-700 border-green-300';
+            
+            const canEdit = currentUser.role === 'admin' || currentUser.id === t.pegawai_id;
+            let statusHTML = canEdit ? `<select onchange="updateStatus(${t.id}, this.value)" class="text-xs px-3 py-1.5 rounded-md border font-bold outline-none cursor-pointer shadow-sm ${bgStatus}">
+                    <option value="Belum Dimulai" ${t.status === 'Belum Dimulai' ? 'selected' : ''}>Belum Dimulai</option><option value="Berproses" ${t.status === 'Berproses' ? 'selected' : ''}>Berproses</option>
+                    <option value="Hold" ${t.status === 'Hold' ? 'selected' : ''}>Hold</option><option value="Selesai" ${t.status === 'Selesai' ? 'selected' : ''}>✓ Selesai</option></select>` 
+                : `<span class="text-xs px-3 py-1.5 rounded-md border font-bold inline-flex items-center gap-1 opacity-80 cursor-not-allowed ${bgStatus}" title="Hanya Admin atau ${namaPic} yang bisa mengubah"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>${t.status}</span>`;
+            
+            let historyHTML = `
+                <div class="text-[11px] space-y-1">
+                    <div class="text-gray-500"><span class="font-bold">Dibuat:</span> ${formatWaktu(t.created_at)}</div>
+                    ${t.started_at ? `<div class="text-blue-600"><span class="font-bold">Mulai Proses:</span> ${formatWaktu(t.started_at)}</div>` : ''}
+                    ${t.hold_at ? `<div class="text-orange-600"><span class="font-bold">Di-Hold:</span> ${formatWaktu(t.hold_at)}</div>` : ''}
+                    ${t.completed_at ? `<div class="text-green-600"><span class="font-bold">Selesai:</span> ${formatWaktu(t.completed_at)}</div>` : ''}
+                </div>
+            `;
+            let keterangan = t.status === 'Hold' && t.alasan_hold ? `<span class="text-orange-600 font-medium">${t.alasan_hold}</span>` : `<span class="text-gray-400">-</span>`;
+            
+            taskList.innerHTML += `<tr class="border-b hover:bg-gray-50">
+                <td class="p-4 align-top"><div class="font-semibold text-gray-800 leading-tight">${t.judul_tugas}</div><div class="text-xs text-blue-600 font-bold mt-1 uppercase">${t.kategori}</div></td>
+                <td class="p-4 align-top font-medium text-gray-800">${namaPic}</td><td class="p-4 align-top">${statusHTML}</td><td class="p-4 align-top">${historyHTML}</td><td class="p-4 align-top text-sm">${keterangan}</td></tr>`;
+        });
+    }
+
+    async function updateStatus(taskId, newStatus) {
+        const currentTask = tugasList.find(t => t.id === taskId); if (!currentTask) return;
+        let alasan = currentTask.alasan_hold || '';
+        
+        if (newStatus === 'Hold') { alasan = prompt('Masukkan alasan Hold:'); if (alasan === null) { renderDashboard(); return; } } 
+        else if (newStatus === 'Selesai') { if (!confirm('Tandai tugas ini sebagai Selesai?')) { renderDashboard(); return; } }
+
+        const now = new Date().toISOString(); let updates = { status: newStatus, alasan_hold: alasan };
+        if (newStatus === 'Belum Dimulai') { updates.started_at = null; updates.hold_at = null; updates.completed_at = null; } 
+        else if (newStatus === 'Berproses') { if (!currentTask.started_at) updates.started_at = now; updates.hold_at = null; updates.completed_at = null; } 
+        else if (newStatus === 'Hold') { if (!currentTask.started_at) updates.started_at = now; updates.hold_at = now; updates.completed_at = null; } 
+        else if (newStatus === 'Selesai') { if (!currentTask.started_at) updates.started_at = now; updates.hold_at = null; updates.completed_at = now; }
+
+        const { error } = await db.from('tugas').update(updates).eq('id', taskId);
+        if (error) return alert('Gagal memperbarui status ke database!');
+        await memuatDataAwal();
+    }
+
+    function bukaModalTugas() {
+        const picDropdown = document.getElementById('input-pic'); picDropdown.innerHTML = '<option value="">-- Kosongkan (Belum assign) --</option>';
+        pegawaiList.forEach(p => { if (p.role === 'admin') return; let note = p.status_kehadiran === 'Dinas Luar' ? ' (Dinas Luar)' : ''; picDropdown.innerHTML += `<option value="${p.id}">${p.nama}${note}</option>`; });
+        document.getElementById('input-judul').value = ''; document.getElementById('modal-tambah').classList.remove('hidden');
+    }
+    function tutupModalTugas() { document.getElementById('modal-tambah').classList.add('hidden'); }
+    async function simpanTugasBaru() {
+        const judul = document.getElementById('input-judul').value; const kategori = document.getElementById('input-kategori').value; const picId = document.getElementById('input-pic').value;
+        if (judul.trim() === '') return alert('Judul dokumen wajib diisi!');
+        
+        const { error } = await db.from('tugas').insert([{ judul_tugas: judul, kategori: kategori, pegawai_id: picId ? parseInt(picId) : null }]);
+        if (error) return alert('Gagal menambahkan tugas ke database!');
+
+        tutupModalTugas(); await memuatDataAwal();
+    }
+</script>
+</body>
+</html>
