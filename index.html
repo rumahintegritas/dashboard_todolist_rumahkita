@@ -239,11 +239,11 @@
     
     function renderDaftarHapusStaf() {
         const listContainer = document.getElementById('list-kelola-staf');
-        listContainer.innerHTML = '';
+        listContainer.inner = '';
         const stafAktif = pegawaiList.filter(p => p.role !== 'admin');
         
         if (stafAktif.length === 0) {
-            listContainer.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed">Belum ada staf yang terdaftar.</p>';
+            listContainer.inner = '<p class="text-sm text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed">Belum ada staf yang terdaftar.</p>';
             return;
         }
 
