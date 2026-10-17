@@ -93,7 +93,7 @@
     </div>
 </div>
 
-<!-- ================= MODAL KELOLA STAF (TAMBAH & HAPUS TERPUSAT) ================= -->
+<!-- ================= MODAL KELOLA STAF (TAMBAH, RESET, HAPUS) ================= -->
 <div id="modal-staf" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
         
@@ -103,7 +103,7 @@
             <button onclick="tutupModalStaf()" class="text-gray-400 hover:text-red-500 text-2xl font-bold leading-none">&times;</button>
         </div>
         
-        <!-- Body Modal (Bisa di-scroll) -->
+        <!-- Body Modal -->
         <div class="p-6 overflow-y-auto custom-scroll flex-1 space-y-8">
             
             <!-- BAGIAN 1: TAMBAH STAF -->
@@ -120,16 +120,16 @@
                 </div>
             </div>
 
-            <!-- BAGIAN 2: HAPUS STAF -->
+            <!-- BAGIAN 2: DAFTAR STAF (RESET & HAPUS) -->
             <div>
-                <h4 class="font-bold text-red-600 mb-4 pb-2 border-b border-red-100 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    Daftar Staf Aktif (Hapus)
+                <h4 class="font-bold text-gray-700 mb-4 pb-2 border-b border-gray-200 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    Daftar Staf Aktif (Kelola)
                 </h4>
                 <div id="list-kelola-staf" class="space-y-2">
                     <!-- Daftar staf akan di-render di sini oleh JavaScript -->
                 </div>
-                <p class="text-[10px] text-gray-500 italic mt-3 leading-tight">*Peringatan: Menghapus staf akan mengubah tugas yang dimilikinya menjadi status "Belum di-assign". Tindakan tidak dapat dibatalkan.</p>
+                <p class="text-[10px] text-gray-500 italic mt-3 leading-tight">*Peringatan: Menghapus staf akan mengubah tugas yang dimilikinya menjadi status "Belum di-assign".</p>
             </div>
             
         </div>
@@ -226,12 +226,12 @@
         resetSemuaFilter(); 
     }
 
-    // --- MODAL KELOLA STAF (TAMBAH & RENDER HAPUS) ---
+    // --- MODAL KELOLA STAF (TAMBAH, RESET & HAPUS) ---
     function bukaModalStaf() {
         document.getElementById('input-staf-nama').value = '';
         document.getElementById('input-staf-user').value = '';
         document.getElementById('input-staf-pass').value = '123456';
-        renderDaftarHapusStaf(); // Render daftar staf di dalam modal
+        renderDaftarHapusStaf(); 
         document.getElementById('modal-staf').classList.remove('hidden');
     }
     
@@ -239,22 +239,25 @@
     
     function renderDaftarHapusStaf() {
         const listContainer = document.getElementById('list-kelola-staf');
-        listContainer.inner = '';
+        listContainer.innerHTML = '';
         const stafAktif = pegawaiList.filter(p => p.role !== 'admin');
         
         if (stafAktif.length === 0) {
-            listContainer.inner = '<p class="text-sm text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed">Belum ada staf yang terdaftar.</p>';
+            listContainer.innerHTML = '<p class="text-sm text-gray-500 italic text-center py-4 bg-gray-50 rounded-lg border border-dashed">Belum ada staf yang terdaftar.</p>';
             return;
         }
 
         stafAktif.forEach(p => {
             listContainer.innerHTML += `
-            <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-red-50 transition-colors">
+            <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 <div>
                     <div class="font-bold text-gray-800 text-sm">${p.nama}</div>
                     <div class="text-xs text-gray-500 font-medium mt-0.5">Username: <span class="text-gray-700">${p.username}</span></div>
                 </div>
-                <button onclick="hapusStaf(event, ${p.id}, '${p.nama}')" class="bg-red-100 text-red-600 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm">Hapus</button>
+                <div class="flex gap-2">
+                    <button onclick="resetSandiStaf(event, ${p.id}, '${p.nama}')" class="bg-yellow-100 text-yellow-700 hover:bg-yellow-500 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm" title="Reset password ke 123456">Reset Sandi</button>
+                    <button onclick="hapusStaf(event, ${p.id}, '${p.nama}')" class="bg-red-100 text-red-600 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors shadow-sm">Hapus</button>
+                </div>
             </div>`;
         });
     }
@@ -277,15 +280,32 @@
             return alert('Gagal menambahkan pegawai ke database!');
         }
 
-        // Segarkan data dan render ulang daftar di modal yang masih terbuka
         await memuatDataAwal(); 
         document.getElementById('input-staf-nama').value = '';
         document.getElementById('input-staf-user').value = '';
         renderDaftarHapusStaf(); 
     }
 
+    async function resetSandiStaf(event, idPegawai, namaPegawai) {
+        event.preventDefault(); 
+        
+        const konfirmasi = confirm(`Apakah Anda yakin ingin mereset password milik "${namaPegawai.toUpperCase()}" kembali ke "123456"?`);
+        if (!konfirmasi) return;
+
+        const { error } = await db.from('pegawai').update({ password: '123456' }).eq('id', idPegawai);
+        
+        if (error) {
+            return alert('Gagal mereset password ke database Supabase.');
+        }
+
+        alert(`Sukses! Password akun ${namaPegawai} telah direset menjadi 123456.`);
+        
+        await memuatDataAwal();
+        renderDaftarHapusStaf(); 
+    }
+
     async function hapusStaf(event, idPegawai, namaPegawai) {
-        event.preventDefault(); // Mencegah form reload jika ada
+        event.preventDefault(); 
         
         const konfirmasi = confirm(`YAKIN HAPUS AKUN "${namaPegawai.toUpperCase()}"?\n\nTindakan ini tidak bisa dibatalkan.`);
         if (!konfirmasi) return;
@@ -299,10 +319,10 @@
         if (filterPicId === idPegawai) filterPicId = null;
         
         await memuatDataAwal();
-        renderDaftarHapusStaf(); // Render ulang daftar hapus setelah berhasil
+        renderDaftarHapusStaf(); 
     }
 
-    // --- FUNGSI DASHBOARD & TABEL (Sama seperti sebelumnya) ---
+    // --- FUNGSI DASHBOARD & TABEL ---
     function bukaModalPassword() { document.getElementById('input-pass-lama').value = ''; document.getElementById('input-pass-baru').value = ''; document.getElementById('input-pass-konfirm').value = ''; document.getElementById('modal-password').classList.remove('hidden'); }
     function tutupModalPassword() { document.getElementById('modal-password').classList.add('hidden'); }
     async function simpanPasswordBaru() {
